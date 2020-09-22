@@ -2,7 +2,7 @@ mod reservoir;
 
 use gnuplot::{AxesCommon, Color, Figure, Fix};
 use ndarray::arr2;
-use ndarray::{s, stack, Array1, Array2, Axis};
+use ndarray::{s, Array1, Array2, Axis};
 use reservoir::Reservoir;
 use std::f64::consts::PI;
 
@@ -31,9 +31,9 @@ fn main() {
     train_data.assign(&(data.slice(s![..train_length])));
 
     let state = train(
-        &input_size,
         &reservoir_size,
         &init_length,
+        &train_length,
         &la_ridge,
         &mut reservoir,
         &train_data,
@@ -43,7 +43,6 @@ fn main() {
     let val = train_result(
         &target,
         &mut reservoir,
-        &input_size,
         &output_size,
         &reservoir_size,
         &init_length,
@@ -63,22 +62,23 @@ fn main() {
 }
 
 fn train(
-    input_size: &usize,
     reservoir_size: &usize,
     init_length: &usize,
+    train_length: &usize,
     la_ridge: &f64,
     reservoir: &mut Reservoir,
     train_data: &Array1<f64>,
     target: &Array2<f64>,
 ) -> Array2<f64> {
-    let mut X: Array2<f64> = Array2::zeros((0, *reservoir_size));
+    let mut X: Array2<f64> = Array2::zeros((*train_length - *init_length, *reservoir_size));
     let mut state: Array2<f64> = Array2::zeros((*reservoir_size, 1));
 
     for (i, val) in train_data.iter().enumerate() {
         state = reservoir.next_state(&arr2(&[[*val]]), &state);
 
         if i >= *init_length {
-            X = stack![Axis(0), X, state.t()];
+            let mut av = X.row_mut(i - *init_length);
+            av.assign(&state.column(0));
         }
     }
     reservoir.update_w(&X, target, la_ridge);
@@ -89,21 +89,21 @@ fn train(
 fn train_result(
     target: &Array2<f64>,
     reservoir: &mut Reservoir,
-    input_size: &usize,
     output_size: &usize,
     reservoir_size: &usize,
     init_length: &usize,
     train_length: &usize,
 ) -> f64 {
-    let mut outputs: Array2<f64> = Array2::zeros((0, *output_size));
+    let mut outputs: Array2<f64> = Array2::zeros((*train_length - *init_length, *output_size));
     let mut state: Array2<f64> = Array2::zeros((*reservoir_size, 1));
     let mut val: f64 = 0.0;
 
-    for v in target {
+    for (i, v) in target.iter().enumerate() {
         val = *v;
         state = reservoir.next_state(&arr2(&[[val]]), &state);
 
-        outputs = stack![Axis(0), outputs, reservoir.output(&state)];
+        let mut av = outputs.row_mut(i);
+        av.assign(&reservoir.output(&state).column(0));
     }
 
     let mut fg = Figure::new();
@@ -131,16 +131,17 @@ fn predict(
     reservoir: &mut Reservoir,
 ) {
     let mut state: Array2<f64> = state;
-    let mut outputs: Array2<f64> = Array2::zeros((0, *output_size));
+    let mut outputs: Array2<f64> = Array2::zeros((*test_length, *output_size));
 
     let mut y: Array2<f64> = Array2::zeros((*output_size, 1));
     y.fill(val);
 
-    for _ in 0..*test_length {
+    for i in 0..*test_length {
         state = reservoir.next_state(&y, &state);
         y = reservoir.output(&state);
 
-        outputs = stack![Axis(0), outputs, y];
+        let mut av = outputs.row_mut(i);
+        av.assign(&y.column(0));
     }
 
     let mut fg = Figure::new();
