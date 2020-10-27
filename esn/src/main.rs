@@ -133,11 +133,14 @@ fn predict(
     let mut state: Array2<f64> = state;
     let mut outputs: Array2<f64> = Array2::zeros((*test_length, *output_size));
 
+    let mut test_data: Array1<f64> = Array1::zeros(*test_length);
+    test_data.assign(&(data.slice(s![*train_length..])));
+
     let mut y: Array2<f64> = Array2::zeros((*output_size, 1));
     y.fill(val);
 
-    for i in 0..*test_length {
-        state = reservoir.next_state(&y, &state);
+    for (i, val) in test_data.iter().enumerate() {
+        state = reservoir.next_state(&arr2(&[[*val]]), &state);
         y = reservoir.output(&state);
 
         let mut av = outputs.row_mut(i);
@@ -149,7 +152,7 @@ fn predict(
         .lines(*train_length..*tmax, outputs.iter(), &[Color("blue")])
         .lines(
             *train_length..*tmax,
-            data.slice(s![*train_length..]).to_owned().iter(),
+            test_data.iter(),
             &[Color("red")],
         )
         .set_y_range(Fix(-1.1), Fix(1.1));
