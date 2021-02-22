@@ -1,0 +1,10 @@
+[package]
+name = "function_and_procedure"
+version = "0.1.0"
+authors = ["kmhk-naka <phytran35@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+icecream = "0.1.0"
